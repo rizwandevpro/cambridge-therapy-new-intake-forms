@@ -18,10 +18,10 @@ export const CLINIC = {
 //   phoneFrom → borrow another entry's phone (virtual visits use Westland's)
 // If the resulting phone is blank, the PRACTICE_PHONE env variable is used.
 export const LOCATIONS = [
-  { value: "Westland",  label: "In person at our Westland office",  printAs: "Westland",      inPerson: true,  phone: "", enabled: true },
+  { value: "Westland",  label: "In person at our Westland office",  printAs: "Westland",      inPerson: true,  phone: "(734) 742-5700", enabled: true },
   { value: "Virtual",   label: "Virtual visit (online)",            printAs: "Virtual visit", inPerson: false, phoneFrom: "Westland", enabled: true },
-  { value: "Hamtramck", label: "In person at our Hamtramck office", printAs: "Hamtramck",     inPerson: true,  phone: "", enabled: false },
-  { value: "Roseville", label: "In person at our Roseville office", printAs: "Roseville",     inPerson: true,  phone: "", enabled: false },
+  { value: "Hamtramck", label: "In person at our Hamtramck office", printAs: "Hamtramck",     inPerson: true,  phone: "(313) 826-0680", enabled: false },
+  { value: "Roseville", label: "In person at our Roseville office", printAs: "Roseville",     inPerson: true,  phone: "(586) 929-1044", enabled: false },
 ];
 
 export const activeLocations = () => LOCATIONS.filter((l) => l.enabled);
