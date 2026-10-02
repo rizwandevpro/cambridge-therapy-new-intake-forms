@@ -138,18 +138,19 @@ export default function PatientForms() {
         setPhase("form");
         return;
       }
-      if (!res.ok || !data.ok) throw new Error(data.error || "default");
+      if (!res.ok || !data.ok) { const e = new Error(data.error || "default"); e.detail = data.detail; throw e; }
       clearDraft();
       let url = null;
       if (data.pdfBase64) {
         const bytes = Uint8Array.from(atob(data.pdfBase64), (c) => c.charCodeAt(0));
         url = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
       }
-      setResult({ url, fileName: data.fileName, patientEmailSent: data.patientEmailSent, email: answers.client_email, name: answers.client_preferred_name || answers.client_legal_name });
+      setResult({ url, fileName: data.fileName, patientEmailSent: data.patientEmailSent, dryRun: data.dryRun, detail: data.detail, email: answers.client_email, name: answers.client_preferred_name || answers.client_legal_name });
       setAnswers({});
       setPhase("done");
     } catch (err) {
-      setSubmitError(SUBMIT_ERRORS[err?.message] || (err instanceof TypeError ? SUBMIT_ERRORS.network : SUBMIT_ERRORS.default));
+      const msg = SUBMIT_ERRORS[err?.message] || (err instanceof TypeError ? SUBMIT_ERRORS.network : SUBMIT_ERRORS.default);
+      setSubmitError(err?.detail ? `${msg} [Developer detail: ${err.detail}]` : msg); // detail is only sent in dev
       setPhase("form");
     }
   };
@@ -281,15 +282,27 @@ export default function PatientForms() {
         {phase === "done" && result && (
           <div className="card">
             <h1 className="step-title" tabIndex={-1} ref={titleRef}>Thank you{result.name ? `, ${result.name.split(" ")[0]}` : ""}</h1>
-            <p className="step-intro">Your forms were sent to {CLINIC.shortName}. There is nothing else you need to do before your visit.</p>
+            {result.dryRun ? (
+              <p className="crisis">
+                Developer note: this was a dry run. The server did not find RESEND_API_KEY, so no email was sent to the clinic or the patient.
+                Put the key in a file named .env.local in the project root and restart the dev server.
+              </p>
+            ) : (
+              <>
+                <p className="step-intro">Your forms were sent to {CLINIC.shortName}. There is nothing else you need to do before your visit.</p>
+                <p className="step-intro">
+                  {result.email && result.patientEmailSent
+                    ? `A copy is on its way to ${result.email}. If you don't see it, check your spam or junk folder.`
+                    : result.email
+                      ? "We couldn't email your copy, so please download it below if you would like one."
+                      : "You can download a copy for your records below."}
+                </p>
+                {result.detail && <p className="crisis">Developer detail (shown in dev only): {result.detail}</p>}
+              </>
+            )}
             <p className="step-intro">
-              {result.email && result.patientEmailSent
-                ? `A copy is on its way to ${result.email}. If you don't see it, check your spam or junk folder.`
-                : result.email
-                  ? "We couldn't email your copy, so please download it below if you would like one."
-                  : "You can download a copy for your records below."}
+              For your privacy, the draft that was saved in this browser while you were filling in the forms has been cleared. This does not affect the forms you just sent.
             </p>
-            <p className="step-intro">Your saved answers have been removed from this device.</p>
             {result.url && (
               <div className="actions">
                 <span />

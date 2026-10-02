@@ -13,7 +13,9 @@ npm run dev                    # http://localhost:3000
 npm run test:pdf               # fills a stress-test sample → ./tmp/*.pdf (no email)
 ```
 
-Without `RESEND_API_KEY`, `npm run dev` runs in **dry-run** mode: the PDF is built and downloadable, no email is sent. In production a missing key is an error.
+Without `RESEND_API_KEY`, `npm run dev` runs in **dry-run** mode: the PDF is built and downloadable, no email is sent, and the final screen says so. In production a missing key is an error.
+
+Env changes are only read at startup: restart `npm run dev` after editing `.env.local`. In dev, if Resend rejects an email, its reason is printed in the terminal (`[submit-intake] …`) and shown on screen; in production it is logged only.
 
 | Variable | Purpose |
 | --- | --- |

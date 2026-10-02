@@ -28,6 +28,23 @@ export const maxDuration = 60;
 const MAX_BODY_CHARS = 1_500_000;
 const TEMPLATE = path.join(process.cwd(), "templates", "therapy-intake.pdf");
 
+const isDev = process.env.NODE_ENV !== "production";
+
+// Resend allows only a couple of requests per second; the clinic and patient
+// emails go out back to back, so retry once if the second one is throttled.
+async function send(resend, message) {
+  let res = await resend.emails.send(message);
+  if (res.error && (res.error.statusCode === 429 || res.error.name === "rate_limit_exceeded")) {
+    await new Promise((r) => setTimeout(r, 1200));
+    res = await resend.emails.send(message);
+  }
+  return res;
+}
+
+// Resend's own error text (e.g. "domain is not verified"). It describes the
+// account/config problem; it is logged, and shown on screen only in dev.
+const reason = (error) => `${error?.name || "error"}: ${error?.message || "no details"}`;
+
 const fail = (status, error, extra = {}) => NextResponse.json({ ok: false, error, ...extra }, { status });
 
 export async function POST(req) {
@@ -71,6 +88,8 @@ export async function POST(req) {
     const fileName = `Therapy-Intake-${safeName}-${today}.pdf`;
 
     let patientEmailSent = false;
+    let patientEmailError = "";
+    if (dryRun) console.warn("[submit-intake] DRY RUN: RESEND_API_KEY was not found, so no email was sent. Put it in .env.local and restart the dev server.");
     if (!dryRun) {
       const resend = new Resend(apiKey);
       const from = process.env.FROM_EMAIL || "Cambridge Psychiatry Forms <reports@cambridgemich.com>";
@@ -79,24 +98,27 @@ export async function POST(req) {
       // The clinic copy is the one that matters: if it fails, the patient is
       // told nothing was sent and can retry (their answers are still on screen).
       const c = clinicEmail({ name, email: answers.client_email, phone: answers.client_phone, location: answers.clinic_location, addendumItems });
-      const clinicRes = await resend.emails.send({
+      const clinicRes = await send(resend, {
         from, to: clinicTo, subject: c.subject, html: c.html,
         ...(answers.client_email ? { replyTo: answers.client_email } : {}),
         attachments: [{ filename: fileName, content: Buffer.from(clinicBytes) }],
       });
       if (clinicRes.error) {
-        console.error("[submit-intake] clinic email failed:", clinicRes.error.name || "error");
-        return fail(502, "send_failed");
+        console.error("[submit-intake] clinic email failed:", reason(clinicRes.error));
+        return fail(502, "send_failed", isDev ? { detail: reason(clinicRes.error) } : {});
       }
 
       if (answers.client_email) {
         const p = patientEmail({ name: answers.client_preferred_name || name, location: answers.clinic_location, officePhone });
-        const patientRes = await resend.emails.send({
+        const patientRes = await send(resend, {
           from, to: answers.client_email, subject: p.subject, html: p.html,
           attachments: [{ filename: fileName, content: Buffer.from(patientBytes) }],
         });
         patientEmailSent = !patientRes.error;
-        if (patientRes.error) console.error("[submit-intake] patient email failed:", patientRes.error.name || "error");
+        if (patientRes.error) {
+          patientEmailError = reason(patientRes.error);
+          console.error("[submit-intake] patient email failed:", patientEmailError);
+        }
       }
     }
 
@@ -106,6 +128,7 @@ export async function POST(req) {
       pdfBase64: Buffer.from(patientBytes).toString("base64"),
       patientEmailSent,
       dryRun,
+      ...(isDev && patientEmailError ? { detail: patientEmailError } : {}),
     });
   } catch (err) {
     // Log the failure, never the answers.
