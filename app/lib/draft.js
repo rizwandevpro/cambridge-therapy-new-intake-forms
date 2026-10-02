@@ -12,7 +12,7 @@ import { ALL_FIELDS, FORMS } from "../forms/index.js";
 import { DRAFT } from "./config.js";
 
 const notStored = ({ field, form }) =>
-  DRAFT.excludeForms.includes(form.id) || field.type === "signature" || field.signatureStyle;
+  DRAFT.excludeForms.includes(form.id) || field.type === "signature" || field.signatureStyle || field.noDraft;
 
 const SKIP_IDS = new Set(ALL_FIELDS.filter(notStored).map(({ field }) => field.id));
 

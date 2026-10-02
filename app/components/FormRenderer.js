@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // FormRenderer — draws one step from a form's steps.js. Every form in the
 // packet goes through this component, so spacing, labels, errors and
-// accessibility behave identically on all 27 screens.
+// accessibility behave identically on every screen.
 // ─────────────────────────────────────────────────────────────────────────────
 import SignaturePad from "./SignaturePad";
 import { isRequired, isVisible } from "../lib/validate.js";

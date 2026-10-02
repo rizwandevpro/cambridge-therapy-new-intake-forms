@@ -1,6 +1,8 @@
 // PDF page 1 — New Client Intake
 // (The "Practice information" block is filled by the server from config/env.)
-import { LOCATIONS } from "../../lib/config.js";
+import { activeLocations } from "../../lib/config.js";
+
+const VISIT = activeLocations().map(({ value, label }) => ({ value, label }));
 
 const isMinor = (a) => a._age !== null && a._age < 18;
 
@@ -12,8 +14,8 @@ export default {
     {
       title: "Let's start with your details",
       fields: [
-        ...(LOCATIONS.length
-          ? [{ id: "clinic_location", type: "select", label: "Which office will you be visiting?", options: LOCATIONS, required: true, requiredMessage: "Choose the office you plan to visit." }]
+        ...(VISIT.length > 1
+          ? [{ id: "clinic_location", type: "radio", label: "How will you be seen?", options: VISIT, required: true, requiredMessage: "Choose how you will be seen so we can route your forms." }]
           : []),
         { id: "client_legal_name", type: "text", label: "Legal name", pdf: "client_legal_name", required: true, autoComplete: "name", requiredMessage: "Add your legal name so we can match your records." },
         { id: "client_preferred_name", type: "text", label: "Preferred name", pdf: "client_preferred_name", half: true },

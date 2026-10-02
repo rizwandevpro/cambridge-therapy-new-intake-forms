@@ -235,7 +235,7 @@ export default function PatientForms() {
             <p className="part">Part {pos.s + 1} of {form.steps.length}</p>
             <h1 className="step-title" tabIndex={-1} ref={titleRef}>{step.title}</h1>
             {step.intro && <p className="step-intro">{step.intro}</p>}
-            {form.crisisNotice && CRISIS_NOTICE.enabled && <p className="crisis">{CRISIS_NOTICE.text}</p>}
+            {(form.crisisNotice || step.crisisNotice) && CRISIS_NOTICE.enabled && <p className="crisis">{CRISIS_NOTICE.text}</p>}
 
             {(submitError || errorCount > 0) && (
               <p className="error-summary" role="alert">

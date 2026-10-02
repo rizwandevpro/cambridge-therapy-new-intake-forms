@@ -20,9 +20,9 @@ export function clinicEmail({ name, email, phone, location, addendumItems }) {
   return {
     subject: `New therapy intake packet: ${name}${location ? ` (${location})` : ""}`,
     html: shell("New client: therapy intake packet", `
-      <p style="margin:0 0 12px;">A new client has completed the Therapy New Client Intake Packet. The PDF is attached.</p>
+      <p style="margin:0 0 12px;">A new client has completed the Therapy New Client Intake Packet and the PHQ-9. Both are in the attached PDF (the PHQ-9 is page 10).</p>
       <table style="width:100%;border-collapse:collapse;">
-        ${row("Client", name)}${row("Phone", phone)}${row("Email", email)}${row("Location", location)}
+        ${row("Client", name)}${row("Phone", phone)}${row("Email", email)}${row("Visit", location)}
       </table>
       <p style="margin:16px 0 0;color:#5b6777;font-size:13px;">
         The "Clinician use" boxes and clinician signature in this PDF are live form fields: open it in a PDF reader to type into them.

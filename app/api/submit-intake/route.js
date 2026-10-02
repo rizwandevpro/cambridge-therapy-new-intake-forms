@@ -3,14 +3,14 @@
 //
 // The browser sends ANSWERS (JSON), never a PDF. This route:
 //   1. normalizes + re-validates every answer with the same rules as the UI
-//   2. fills the AcroForm template (lib/pdf/fillPacket.js)
+//   2. fills the AcroForm template and appends the PHQ-9 page (lib/pdf/fillPacket.js)
 //   3. emails the clinic copy and the patient copy through Resend
 //   4. returns the patient copy so the browser can offer a download
 //
 // Nothing is written to disk or a database, and no answers are logged.
 //
 // .env: RESEND_API_KEY, CLINIC_EMAIL, FROM_EMAIL, PRACTICE_EMAIL, PRACTICE_PHONE (fallback)
-// Office phone numbers: LOCATION_PHONES in app/lib/config.js
+// Office phone numbers: LOCATIONS in app/lib/config.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
@@ -20,13 +20,14 @@ import { fillPacket } from "../../lib/pdf/fillPacket.js";
 import { normalizeAnswers, validateAll } from "../../lib/validate.js";
 import { todayISO } from "../../lib/derive.js";
 import { clinicEmail, patientEmail } from "../../lib/email.js";
-import { LOCATION_PHONES } from "../../lib/config.js";
+import { locationInfo } from "../../lib/config.js";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 const MAX_BODY_CHARS = 1_500_000;
 const TEMPLATE = path.join(process.cwd(), "templates", "therapy-intake.pdf");
+const PHQ9 = path.join(process.cwd(), "templates", "phq9.pdf");
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -73,10 +74,13 @@ export async function POST(req) {
 
   try {
     const today = todayISO();
-    // One email for the whole practice, one phone per office.
-    const officePhone = LOCATION_PHONES[answers.clinic_location] || process.env.PRACTICE_PHONE || "";
+    // One email for the whole practice; the phone follows the chosen location
+    // (virtual visits use the Westland number — see LOCATIONS in config.js).
+    const loc = locationInfo(answers.clinic_location);
+    const officePhone = loc?.phone || process.env.PRACTICE_PHONE || "";
     const { clinicBytes, patientBytes, addendumItems } = await fillPacket({
       templateBytes: await readFile(TEMPLATE),
+      phq9Bytes: await readFile(PHQ9),
       answers,
       today,
       practicePhone: officePhone,
@@ -97,7 +101,7 @@ export async function POST(req) {
 
       // The clinic copy is the one that matters: if it fails, the patient is
       // told nothing was sent and can retry (their answers are still on screen).
-      const c = clinicEmail({ name, email: answers.client_email, phone: answers.client_phone, location: answers.clinic_location, addendumItems });
+      const c = clinicEmail({ name, email: answers.client_email, phone: answers.client_phone, location: loc?.printAs, addendumItems });
       const clinicRes = await send(resend, {
         from, to: clinicTo, subject: c.subject, html: c.html,
         ...(answers.client_email ? { replyTo: answers.client_email } : {}),
@@ -109,7 +113,7 @@ export async function POST(req) {
       }
 
       if (answers.client_email) {
-        const p = patientEmail({ name: answers.client_preferred_name || name, location: answers.clinic_location, officePhone });
+        const p = patientEmail({ name: answers.client_preferred_name || name, location: loc?.inPerson ? loc.printAs : "", officePhone });
         const patientRes = await send(resend, {
           from, to: answers.client_email, subject: p.subject, html: p.html,
           attachments: [{ filename: fileName, content: Buffer.from(patientBytes) }],

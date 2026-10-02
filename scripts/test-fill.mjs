@@ -15,7 +15,7 @@ const raw = {};
 for (const { field } of ALL_FIELDS) {
   switch (field.type) {
     case "yesno": raw[field.id] = "yes"; break;
-    case "radio": raw[field.id] = field.options[field.options.length - 1].value; break;
+    case "radio": raw[field.id] = field.id.startsWith("phq9_") ? String((Number(field.id.split("_")[1]) || 2) % 4) : field.options[field.options.length - 1].value; break;
     case "select": raw[field.id] = field.options[0]; break;
     case "checks": raw[field.id] = field.options.map((o) => o.value); break;
     case "ack": raw[field.id] = true; break;
@@ -35,7 +35,8 @@ const problems = validateAll(answers);
 if (problems.length) { console.error("Validation problems:", problems); process.exit(1); }
 
 const templateBytes = await readFile(new URL("../templates/therapy-intake.pdf", import.meta.url));
-const out = await fillPacket({ templateBytes, answers, today: "2026-10-02", practicePhone: "(734) 555-0100", practiceEmail: "office@example.com" });
+const phq9Bytes = await readFile(new URL("../templates/phq9.pdf", import.meta.url));
+const out = await fillPacket({ templateBytes, phq9Bytes, answers, today: "2026-10-02", practicePhone: "(734) 555-0100", practiceEmail: "office@example.com" });
 await mkdir(new URL("../tmp/", import.meta.url), { recursive: true });
 await writeFile(new URL("../tmp/clinic-copy.pdf", import.meta.url), out.clinicBytes);
 await writeFile(new URL("../tmp/patient-copy.pdf", import.meta.url), out.patientBytes);

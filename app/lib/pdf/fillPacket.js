@@ -22,7 +22,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import * as pdfLibNS from "pdf-lib";
 import { ALL_FIELDS } from "../../forms/index.js";
-import { CLINIC, CLINICIAN_FIELDS } from "../config.js";
+import { CLINIC, CLINICIAN_FIELDS, locationInfo } from "../config.js";
+import { drawPhq9 } from "./phq9.js";
 import { withDerived } from "../derive.js";
 import { isVisible } from "../validate.js";
 import { toUSDate } from "../formatDate.js";
@@ -119,7 +120,7 @@ function collectValues(answers, { today, practicePhone, practiceEmail }) {
     if (!isVisible(field, a) || v === undefined || v === null || v === "") continue;
     switch (field.type) {
       case "yesno":  checks.add(`${field.pdf}_${v}`); break;
-      case "radio":  { const o = field.options.find((x) => x.value === v); if (o) checks.add(o.pdf); break; }
+      case "radio":  { const o = field.options.find((x) => x.value === v); if (o?.pdf) checks.add(o.pdf); break; } // options without `pdf` (location, PHQ-9) are handled elsewhere
       case "checks": field.options.filter((o) => v.includes(o.value)).forEach((o) => checks.add(o.pdf)); break;
       case "ack":    if (v === true) checks.add(field.pdf); break;
       case "signature": images.set(field.pdf, v); break;
@@ -145,7 +146,8 @@ function collectValues(answers, { today, practicePhone, practiceEmail }) {
 
   // Derived / practice values — never typed by the patient.
   const usToday = toUSDate(today);
-  setText("practice_name", a.clinic_location ? `${CLINIC.name} (${a.clinic_location})` : CLINIC.name);
+  const loc = locationInfo(a.clinic_location);
+  setText("practice_name", loc ? `${CLINIC.name} (${loc.printAs})` : CLINIC.name);
   setText("practice_phone", practicePhone);
   setText("practice_email", practiceEmail);
   setText("intake_date", usToday);
@@ -191,7 +193,7 @@ function drawAddendum(doc, items, { font, bold, clientName, usToday, firstPageNo
 }
 
 // ── Main ─────────────────────────────────────────────────────────────────────
-export async function fillPacket({ templateBytes, answers, today, practicePhone = "", practiceEmail = "" }) {
+export async function fillPacket({ templateBytes, phq9Bytes, answers, today, practicePhone = "", practiceEmail = "" }) {
   const doc  = await PDFDocument.load(templateBytes);
   const form = doc.getForm();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -262,12 +264,23 @@ export async function fillPacket({ templateBytes, answers, today, practicePhone 
   // Answers with no box of their own (e.g. a 5th medication)
   for (const e of extras) overflow(e.label, e.page, clean(e.text));
 
+  // PHQ-9: copy its page in after page 9 and mark the answers on it.
+  if (phq9Bytes) {
+    const [phqPage] = await doc.copyPages(await PDFDocument.load(phq9Bytes), [0]);
+    doc.addPage(phqPage);
+    drawPhq9(phqPage, {
+      answers, font, bold, ink: INK, LineCapStyle,
+      name: clean(answers.client_legal_name || ""),
+      usDate: toUSDate(today),
+    });
+  }
+
   if (addendum.length) {
     drawAddendum(doc, addendum, {
       font, bold,
       clientName: clean(answers.client_legal_name || "Client"),
       usToday: toUSDate(today),
-      firstPageNo: pages.length + 1,
+      firstPageNo: doc.getPageCount() + 1,
     });
   }
 
